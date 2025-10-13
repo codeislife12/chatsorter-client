@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+.Python
+
+# Virtual environment
+env/
+venv/
+
+# Databases and cache
+*.db
+*.sqlite
+embeddings_cache/
+data/
+json/
+master/
+faiss_index/
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
