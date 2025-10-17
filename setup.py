@@ -10,14 +10,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="chatsorter-client",
+    name="ChatSorter",
     version="1.0.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="ChatSorter Team",
+    author_email="theiogamer1st@gmail.com",
     description="Official Python client for ChatSorter Memory API",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/chatsorter-client",
+    url="https://github.com/codeislife12/chatsorter-client",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -44,8 +44,7 @@ setup(
     },
     keywords="chatbot memory api semantic-search ai llm",
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/chatsorter-client/issues",
-        "Source": "https://github.com/yourusername/chatsorter-client",
-        "Documentation": "https://docs.chatsorter.io",
+        "Bug Reports": "https://github.com/codeislife12/chatsorter-client/issues",
+        "Source": "https://github.com/codeislife12/chatsorter-client",
     },
 )
