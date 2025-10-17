@@ -1,54 +1,64 @@
-# ChatSorter Client
+## Prerequisites
 
-Add long-term memory to your chatbot in 5 minutes.
+Before installing, make sure you have:
+- Python 3.7+ installed
+- Git installed ([Download here](https://git-scm.com/downloads))
 
-## 🚀 Quick Start
+**Windows users:** After installing Git, restart your terminal/command prompt.
 
-### 1. Get Your API Key
-Email theiogamer1st@gmail.com with subject "ChatSorter Demo Key"
+To verify Git is installed:
+````bash
+git --version
+````
 
-Demo keys are free during beta and include:
-- 10,000 messages/month
-- 5,000 searches/month
-- All features enabled
+### Solution 2: Provide Alternative Installation (Better!)
+````markdown
+## Installation
 
-### 2. Install
-Make sure git is installed
+### Option A: Install from GitHub (requires Git)
 ```bash
 pip install git+https://github.com/codeislife12/chatsorter-client.git
 ```
 
-### 3. Add to Your Chatbot
-```python
-from chatsorter_client import ChatSorterClient
-
-# Initialize with your API key
-client = ChatSorterClient(api_key="sk_live_YOUR_KEY_HERE")
-
-# Store a message
-client.process(
-    chat_id="user_123",  # Unique ID per user
-    message="I love pizza and my name is John"
-)
-
-# Search memory
-results = client.search(
-    chat_id="user_123",
-    query="What does the user like?"
-)
-
-# Use results in your prompt
-for result in results:
-    print(result['content'])  # "I love pizza and my name is John"
+### Option B: Install without Git
+Download the repository as ZIP, extract it, then:
+```bash
+cd chatsorter-client
+pip install .
 ```
 
-### 4. Full Example (Flask + Local GGUF)
-```python
-[Your complete chatbot example here]
+### Option C: Direct install (coming soon)
+```bash
+pip install chatsorter-client  # When we publish to PyPI
 ```
 
-## 📖 Documentation
-[Link to full docs when you make them]
+---
 
-## 💰 Pricing
-Free during beta. Paid plans starting at $40/month after launch.
+## BETTER LONG-TERM SOLUTION:
+
+**Publish to PyPI** so customers can just do:
+```bash
+pip install chatsorter-client
+```
+
+No Git needed!
+
+---
+
+## For NOW:
+
+Add to your README:
+```markdown
+⚠️ **Important:** This installation method requires Git to be installed.
+
+**Don't have Git?** 
+- Windows: https://git-scm.com/download/win
+- Mac: Comes pre-installed
+- Linux: `sudo apt install git` or `sudo yum install git`
+
+After installing Git, **restart your terminal** before running pip install.
+```
+
+---
+
+**Continue roleplay - assume you installed Git and tried again. What happens next?**
