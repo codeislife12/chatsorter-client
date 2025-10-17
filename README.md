@@ -13,6 +13,7 @@ Demo keys are free during beta and include:
 - All features enabled
 
 ### 2. Install
+Make sure git is installed
 ```bash
 pip install git+https://github.com/codeislife12/chatsorter-client.git
 ```
