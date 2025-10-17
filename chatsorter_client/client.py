@@ -26,13 +26,13 @@ class ChatSorter:
         context = client.get_context(chat_id="user123", message="What should I eat?")
     """
     
-    def __init__(self, api_key: str, base_url: str = "http://localhost:5000"):
+    def __init__(self, api_key: str, base_url: str = "https://chatsorter-api.onrender.com"):
         """
         Initialize ChatSorter client
         
         Args:
             api_key: Your ChatSorter API key (get from dashboard)
-            base_url: API endpoint (default: http://localhost:5000)
+            base_url: API endpoint (default: https://chatsorter-api.onrender.com)
         """
         self.api_key = api_key
         self.base_url = base_url.rstrip('/')
@@ -72,6 +72,28 @@ class ChatSorter:
         )
         response.raise_for_status()
         return response.json()
+    
+    def process(self, chat_id: str, message: str, 
+               tool_result: Optional[Dict] = None) -> Dict:
+        """
+        Alias for add_message() - matches API endpoint name
+        
+        Args:
+            chat_id: Unique identifier for this conversation
+            message: The message text to store
+            tool_result: Optional metadata about tools used
+            
+        Returns:
+            Dict with processing results including importance score
+            
+        Example:
+            result = client.process(
+                chat_id="user123",
+                message="My favorite food is pizza"
+            )
+            print(f"Importance: {result['result']['importance_score']}")
+        """
+        return self.add_message(chat_id, message, tool_result)
     
     def search(self, chat_id: str, query: str, 
               use_vector_db: bool = True, limit: int = 5) -> Dict:
