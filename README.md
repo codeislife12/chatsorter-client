@@ -1,17 +1,53 @@
-# ChatSorter API Backend
+# ChatSorter Client
 
-Private repository - contains backend logic.
+Add long-term memory to your chatbot in 5 minutes.
 
-## Deploy to Render
+## 🚀 Quick Start
 
-1. Connect this repo to Render
-2. Set environment variables:
-   - `PORT=5000`
-   - `DEBUG=false`
-   - `MODEL_DISABLED=true`
-3. Deploy
+### 1. Get Your API Key
+Email theiogamer1st@gmail.com with subject "ChatSorter Demo Key"
 
-## Local Development
+Demo keys are free during beta and include:
+- 10,000 messages/month
+- 5,000 searches/month
+- All features enabled
+
+### 2. Install
 ```bash
-pip install -r requirements.txt
-python api.py
+pip install git+https://github.com/codeislife12/chatsorter-client.git
+```
+
+### 3. Add to Your Chatbot
+```python
+from chatsorter_client import ChatSorterClient
+
+# Initialize with your API key
+client = ChatSorterClient(api_key="sk_live_YOUR_KEY_HERE")
+
+# Store a message
+client.process(
+    chat_id="user_123",  # Unique ID per user
+    message="I love pizza and my name is John"
+)
+
+# Search memory
+results = client.search(
+    chat_id="user_123",
+    query="What does the user like?"
+)
+
+# Use results in your prompt
+for result in results:
+    print(result['content'])  # "I love pizza and my name is John"
+```
+
+### 4. Full Example (Flask + Local GGUF)
+```python
+[Your complete chatbot example here]
+```
+
+## 📖 Documentation
+[Link to full docs when you make them]
+
+## 💰 Pricing
+Free during beta. Paid plans starting at $40/month after launch.
