@@ -1,10 +1,3 @@
-COMPLETE UPDATED README - TODDLER-PROOF VERSION:
-
-markdown# ChatSorter Client
-
-**Add long-term memory to your company's chatbot in 6 steps.**
-
-Enterprise-grade memory system. $40-80/month vs competitors at $200+.
 
 ---
 
