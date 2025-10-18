@@ -16,14 +16,12 @@ class ChatSorter:
     Usage:
         client = ChatSorter(api_key="sk_test_demo123")
         
-        # Add message
+        # TRUE PLUG AND PLAY (1 line):
+        prompt = client.build_prompt(chat_id="user123", message=user_message)
+        
+        # Or use individual methods:
         client.add_message(chat_id="user123", message="I love pizza")
-        
-        # Search memory
         results = client.search(chat_id="user123", query="food")
-        
-        # Get context for LLM
-        context = client.get_context(chat_id="user123", message="What should I eat?")
     """
     
     def __init__(self, api_key: str, base_url: str = "https://chatsorter-api.onrender.com"):
@@ -41,6 +39,61 @@ class ChatSorter:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         })
+    
+    def build_prompt(self, chat_id: str, message: str, 
+                    prompt_template: str = "{context}{message}",
+                    max_memories: int = 3) -> str:
+        """
+        🚀 PLUG AND PLAY: Automatic memory storage, search, and prompt building
+        
+        This is the easiest way to add memory to your chatbot.
+        Just replace your prompt line with this method.
+        
+        Args:
+            chat_id: Unique user/conversation ID
+            message: Current user message
+            prompt_template: Your prompt format (use {context} and {message} placeholders)
+            max_memories: Max relevant memories to include (default: 3)
+            
+        Returns:
+            Complete prompt with memory context automatically injected
+            
+        Example:
+            # Instead of:
+            prompt = f"User: {user_message}"
+            
+            # Do this:
+            prompt = chatsorter.build_prompt("user123", user_message, "User: {message}")
+            
+            # For chat models (OpenAI, Claude):
+            prompt = chatsorter.build_prompt("user123", user_message, 
+                prompt_template="System: {context}\nUser: {message}")
+        """
+        # 1. Store message in memory
+        try:
+            self.process(chat_id=chat_id, message=message)
+        except Exception as e:
+            print(f"[ChatSorter] Warning: Failed to store message: {e}")
+        
+        # 2. Search for relevant memories
+        context = ""
+        try:
+            search_result = self.search(chat_id=chat_id, query=message)
+            if search_result.get('result', {}).get('found'):
+                memories = search_result['result']['results'][:max_memories]
+                if memories:
+                    context_items = []
+                    for mem in memories:
+                        content = mem.get('content', '')
+                        importance = mem.get('decayed_importance', 0)
+                        context_items.append(f"- {content} (importance: {importance:.1f})")
+                    context = "Previous context:\n" + "\n".join(context_items) + "\n\n"
+        except Exception as e:
+            print(f"[ChatSorter] Warning: Failed to search memory: {e}")
+        
+        # 3. Build final prompt
+        final_prompt = prompt_template.replace("{context}", context).replace("{message}", message)
+        return final_prompt
     
     def add_message(self, chat_id: str, message: str, 
                    tool_result: Optional[Dict] = None) -> Dict:
@@ -85,13 +138,6 @@ class ChatSorter:
             
         Returns:
             Dict with processing results including importance score
-            
-        Example:
-            result = client.process(
-                chat_id="user123",
-                message="My favorite food is pizza"
-            )
-            print(f"Importance: {result['result']['importance_score']}")
         """
         return self.add_message(chat_id, message, tool_result)
     
@@ -155,7 +201,7 @@ class ChatSorter:
             response = openai.ChatCompletion.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": f"Context:\\n{context}"},
+                    {"role": "system", "content": f"Context:\n{context}"},
                     {"role": "user", "content": message}
                 ]
             )
