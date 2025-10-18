@@ -186,7 +186,7 @@ Make sure Git is installed first.
 
 **Solution:** 
 1. Check your API key is copied correctly (no extra spaces)
-2. Make sure you're using `sk_live_...` or `sk_test_demo123`
+2. Make sure you're not mispelling the api key
 3. Email us if your key doesn't work
 
 ---
