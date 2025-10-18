@@ -427,6 +427,61 @@ if results['result']['found']:
 ```
 
 ---
+## View Your Memory Data
+
+### See What's Stored
+
+Add this route to your chatbot to see memory stats:
+```python
+@app.route('/memory-stats')
+def memory_stats():
+    stats = chatsorter.get_stats(chat_id="user_123")
+    return jsonify(stats)
+```
+
+Visit: `http://localhost:5000/memory-stats`
+
+**You'll see:**
+- Total messages stored
+- Number of summaries created
+- Memory items count
+
+---
+
+### View Detailed Memories
+```python
+@app.route('/memory-details')
+def memory_details():
+    analysis = chatsorter.get_memory_analysis(chat_id="user_123")
+    return jsonify(analysis)
+```
+
+Visit: `http://localhost:5000/memory-details`
+
+**You'll see:**
+- All stored memories
+- Importance scores
+- Time decay information
+- Entities extracted
+- Intent detection results
+
+---
+
+### View Only Important Moments
+```python
+@app.route('/memorable-moments')
+def memorable_moments():
+    import requests
+    response = requests.get(
+        "https://chatsorter-api.onrender.com/moments/user_123",
+        headers={"Authorization": f"Bearer {chatsorter.api_key}"}
+    )
+    return jsonify(response.json())
+```
+
+Visit: `http://localhost:5000/memorable-moments`
+
+**Shows only high-importance memories (8.0+)**
 
 ## Need Help?
 
