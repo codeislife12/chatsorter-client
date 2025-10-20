@@ -42,7 +42,8 @@ class ChatSorter:
     
     def build_prompt(self, chat_id: str, message: str, 
                     prompt_template: str = "{context}{message}",
-                    max_memories: int = 3) -> str:
+                    max_memories: int = 3,
+                    simple_context: bool = False) -> str:
         """
         🚀 PLUG AND PLAY: Automatic memory storage, search, and prompt building
         
@@ -54,6 +55,7 @@ class ChatSorter:
             message: Current user message
             prompt_template: Your prompt format (use {context} and {message} placeholders)
             max_memories: Max relevant memories to include (default: 3)
+            simple_context: If True, strip metadata for small models (7B, quantized)
             
         Returns:
             Complete prompt with memory context automatically injected
@@ -64,6 +66,10 @@ class ChatSorter:
             
             # Do this:
             prompt = chatsorter.build_prompt("user123", user_message, "User: {message}")
+            
+            # For small/quantized models (to avoid metadata bleeding):
+            prompt = chatsorter.build_prompt("user123", user_message, 
+                "User: {message}", simple_context=True)
             
             # For chat models (OpenAI, Claude):
             prompt = chatsorter.build_prompt("user123", user_message, 
@@ -78,16 +84,29 @@ class ChatSorter:
         # 2. Search for relevant memories
         context = ""
         try:
-            search_result = self.search(chat_id=chat_id, query=message)
+            search_result = self.search(chat_id=chat_id, query=message, 
+                                       simple_context=simple_context)
             if search_result.get('result', {}).get('found'):
                 memories = search_result['result']['results'][:max_memories]
                 if memories:
                     context_items = []
                     for mem in memories:
                         content = mem.get('content', '')
-                        importance = mem.get('decayed_importance', 0)
-                        context_items.append(f"- {content} (importance: {importance:.1f})")
-                    context = "Previous context:\n" + "\n".join(context_items) + "\n\n"
+                        
+                        if simple_context:
+                            # Clean format for small models (no metadata)
+                            context_items.append(content)
+                        else:
+                            # Rich format for large models (with metadata)
+                            importance = mem.get('decayed_importance', 0)
+                            context_items.append(f"- {content} (importance: {importance:.1f})")
+                    
+                    if simple_context:
+                        # Simple: Just the content, no labels
+                        context = "\n".join(context_items) + "\n\n"
+                    else:
+                        # Rich: With "Previous context:" label
+                        context = "Previous context:\n" + "\n".join(context_items) + "\n\n"
         except Exception as e:
             print(f"[ChatSorter] Warning: Failed to search memory: {e}")
         
@@ -142,7 +161,8 @@ class ChatSorter:
         return self.add_message(chat_id, message, tool_result)
     
     def search(self, chat_id: str, query: str, 
-              use_vector_db: bool = True, limit: int = 5) -> Dict:
+              use_vector_db: bool = True, limit: int = 5,
+              simple_context: bool = False) -> Dict:
         """
         Search memory semantically
         
@@ -151,6 +171,7 @@ class ChatSorter:
             query: Search query (semantic, not keyword)
             use_vector_db: Use vector DB if available (default: True)
             limit: Maximum results to return
+            simple_context: If True, strip metadata from results
             
         Returns:
             Dict with search results ranked by relevance
@@ -170,14 +191,15 @@ class ChatSorter:
             json={
                 "chat_id": chat_id,
                 "query": query,
-                "use_vector_db": use_vector_db
+                "use_vector_db": use_vector_db,
+                "simple_context": simple_context
             }
         )
         response.raise_for_status()
         return response.json()
     
     def get_context(self, chat_id: str, message: str, 
-                   max_results: int = 3) -> str:
+                   max_results: int = 3, simple_context: bool = False) -> str:
         """
         Get relevant context for LLM prompt
         Convenience method that searches and formats results
@@ -186,6 +208,7 @@ class ChatSorter:
             chat_id: Conversation ID
             message: Current user message (used for search)
             max_results: Maximum context items to include
+            simple_context: If True, return clean context without metadata
             
         Returns:
             Formatted string ready to inject into LLM prompt
@@ -206,7 +229,7 @@ class ChatSorter:
                 ]
             )
         """
-        search_result = self.search(chat_id, message)
+        search_result = self.search(chat_id, message, simple_context=simple_context)
         
         if not search_result.get('result', {}).get('found'):
             return ""
@@ -216,8 +239,12 @@ class ChatSorter:
         context_items = []
         for i, item in enumerate(results, 1):
             content = item.get('content', '')
-            importance = item.get('decayed_importance', 0)
-            context_items.append(f"{i}. {content} (importance: {importance:.1f})")
+            
+            if simple_context:
+                context_items.append(content)
+            else:
+                importance = item.get('decayed_importance', 0)
+                context_items.append(f"{i}. {content} (importance: {importance:.1f})")
         
         return "\n".join(context_items)
     
