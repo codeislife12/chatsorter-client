@@ -1,121 +1,59 @@
-# ChatSorter - Semantic Memory for Chatbots
+# ChatSorter - Semantic Memory for AI Chatbots
 
-## What It Does
+Stop sending entire chat histories to your LLM. ChatSorter compresses conversations by 95% using semantic search and importance scoring.
 
-Adds semantic memory to your chatbot in 5 minutes. Reduces API costs by 95% and enables long-term memory retention.
-
-**Your chatbot gets:**
-- Semantic search (meaning-based, not keyword)
-- Importance scoring (critical info never decays)
-- Time-weighted retrieval (recent + important = prioritized)
-- Cross-session persistence (remembers after restarts)
-- Automatic summarization (every 5 messages)
-
-**You save:**
-- 95% on API costs (sends only relevant context, not entire history)
-- 200+ hours building it yourself
-- Infrastructure costs (no vector DB needed)
-
----
-
-## Memory Retention vs Manual History
-
-| Feature | Manual `conversation_history = []` | ChatSorter |
-|---------|-----------------------------------|------------|
-| **Long-term retention** | ❌ Drops old messages when window fills | ✅ Important info retained indefinitely |
-| **Semantic search** | ❌ Can't find "pizza" when asked "what food?" | ✅ Meaning-based retrieval |
-| **Cross-session** | ❌ Lost on restart/browser close | ✅ Persistent storage |
-| **Noise filtering** | ❌ Keeps "ok", "lol", "thanks" | ✅ Auto-filters low-importance messages |
-| **Context limit** | ❌ Hits token limits at scale | ✅ Never hits limits (retrieves top 3-5) |
-| **Cost per request** | 💸 $1.50 (1000 messages @ GPT-4) | 💸 $0.002 (relevant context only) |
-
-**Companies value this:** Users don't repeat themselves. Bot builds relationships over weeks/months. Higher UX = higher retention.
+**What you get:**
+- 95% cost reduction on API calls
+- Semantic retrieval (finds "pizza" when asked "what food?")
+- Automatic importance scoring (critical info never decays)
+- Zero infrastructure (no vector DB, no Redis)
+- 5-minute integration
 
 ---
 
 ## Quick Start
 
-### Install
 ```bash
 pip install git+https://github.com/codeislife12/chatsorter-client.git
 ```
 
-### Get API Key
-Email: theiogamer1st@gmail.com  
-Subject: "ChatSorter Demo Key"
+Get a demo key: Email `theiogamer1st@gmail.com` with subject "ChatSorter Demo Key"
+
+Or use the public demo key (100 messages limit):
+```python
+api_key = "sk_test_demo123"
+```
 
 ---
 
-## Integration (3 Lines)
+## Integration
 
-### Step 1: Import & Initialize
+### Basic Usage
+
 ```python
 from chatsorter_client import ChatSorter
 
-chatsorter = ChatSorter(api_key="sk_live_xxx")  # Or use os.getenv("CHATSORTER_API_KEY")
-```
+chatsorter = ChatSorter(api_key="sk_live_xxx")
 
-### Step 2: Replace Your Prompt Line
-
-**Before:**
-```python
+# Replace this:
 prompt = f"User: {user_message}\nAssistant:"
-```
 
-**After:**
-```python
+# With this:
 prompt = chatsorter.build_prompt(
-    chat_id=session['user_id'],  # Or however you identify users
+    chat_id=user_id,
     message=user_message,
     prompt_template="User: {message}\nAssistant:"
 )
+
+# Your LLM call stays the same
+response = llm(prompt)
 ```
 
-**Done.** Your model call stays the same.
+That's it. ChatSorter handles memory storage, retrieval, and compression automatically.
 
 ---
 
-## Framework-Specific Examples
-
-### Flask + Local GGUF (Llama/Mistral)
-
-```python
-from flask import Flask, request, jsonify
-from llama_cpp import Llama
-from chatsorter_client import ChatSorter
-import re
-
-app = Flask(__name__)
-llm = Llama(model_path="model.gguf", n_ctx=2048, n_threads=8, n_gpu_layers=0)
-chatsorter = ChatSorter(api_key="sk_live_xxx")
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    user_message = request.json['message']
-    user_id = request.json.get('user_id', 'default')
-    
-    prompt = chatsorter.build_prompt(
-        chat_id=user_id,
-        message=user_message,
-        prompt_template="{context}User: {message}\nAssistant:",
-        simple_context=True  # Use for 7B/quantized models
-    )
-    
-    response = llm(prompt, max_tokens=512, temperature=0.7, stop=["User:", "\n\n"])
-    bot_response = response['choices'][0]['text'].strip()
-    
-    # Clean metadata (for small models)
-    bot_response = re.sub(r'\(importance:.*?\)', '', bot_response).strip()
-    
-    return jsonify({'response': bot_response})
-
-if __name__ == '__main__':
-    app.run(port=5000)
-```
-
-**For quantized/small models (Q2_K, Q4_K_M, 7B):** Use `simple_context=True` to prevent metadata bleeding into responses.
-
----
+## Examples
 
 ### Flask + OpenAI
 
@@ -130,147 +68,104 @@ chatsorter = ChatSorter(api_key="sk_live_xxx")
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    user_message = request.json['message']
-    user_id = request.json.get('user_id', 'default')
+    data = request.json
+    user_id = data['user_id']
+    message = data['message']
     
-    # Get context and store message
-    context = chatsorter.get_context(user_id, user_message)
-    chatsorter.process(user_id, user_message)
+    context = chatsorter.get_context(user_id, message)
+    chatsorter.process(user_id, message)
     
     response = openai_client.chat.completions.create(
         model="gpt-4",
         messages=[
-            {"role": "system", "content": f"Previous context: {context}"},
-            {"role": "user", "content": user_message}
+            {"role": "system", "content": f"Context: {context}"},
+            {"role": "user", "content": message}
         ]
     )
     
     return jsonify({'response': response.choices[0].message.content})
-
-if __name__ == '__main__':
-    app.run(port=5000)
 ```
 
----
-
-### Flask + Anthropic Claude
+### Flask + Local GGUF
 
 ```python
 from flask import Flask, request, jsonify
+from llama_cpp import Llama
+from chatsorter_client import ChatSorter
+
+app = Flask(__name__)
+llm = Llama(model_path="model.gguf")
+chatsorter = ChatSorter(api_key="sk_live_xxx")
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    data = request.json
+    
+    prompt = chatsorter.build_prompt(
+        chat_id=data['user_id'],
+        message=data['message'],
+        prompt_template="{context}User: {message}\nAssistant:",
+        simple_context=True  # For quantized/7B models
+    )
+    
+    response = llm(prompt, max_tokens=512)
+    return jsonify({'response': response['choices'][0]['text']})
+```
+
+### Flask + Claude
+
+```python
 from anthropic import Anthropic
 from chatsorter_client import ChatSorter
 
-app = Flask(__name__)
-anthropic_client = Anthropic(api_key="sk-ant-xxx")
+anthropic = Anthropic(api_key="sk-ant-xxx")
 chatsorter = ChatSorter(api_key="sk_live_xxx")
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    user_message = request.json['message']
-    user_id = request.json.get('user_id', 'default')
+    data = request.json
     
-    context = chatsorter.get_context(user_id, user_message)
-    chatsorter.process(user_id, user_message)
+    context = chatsorter.get_context(data['user_id'], data['message'])
+    chatsorter.process(data['user_id'], data['message'])
     
-    message = anthropic_client.messages.create(
+    message = anthropic.messages.create(
         model="claude-3-opus-20240229",
         max_tokens=1024,
-        system=f"Previous context: {context}",
-        messages=[{"role": "user", "content": user_message}]
+        system=f"Context: {context}",
+        messages=[{"role": "user", "content": data['message']}]
     )
     
     return jsonify({'response': message.content[0].text})
-
-if __name__ == '__main__':
-    app.run(port=5000)
-```
-
----
-
-### FastAPI (Async)
-
-```python
-from fastapi import FastAPI, Request
-from chatsorter_client import ChatSorter
-
-app = FastAPI()
-chatsorter = ChatSorter(api_key="sk_live_xxx")
-
-@app.post("/chat")
-async def chat(request: Request):
-    data = await request.json()
-    user_message = data['message']
-    user_id = data.get('user_id', 'default')
-    
-    # ChatSorter is sync but works fine in async
-    prompt = chatsorter.build_prompt(
-        chat_id=user_id,
-        message=user_message,
-        prompt_template="User: {message}\nAssistant:"
-    )
-    
-    response = await your_async_model.generate(prompt)
-    return {"response": response}
-```
-
----
-
-### Multi-User (Sessions)
-
-```python
-from flask import Flask, request, jsonify, session
-from chatsorter_client import ChatSorter
-import uuid
-
-app = Flask(__name__)
-app.secret_key = "your-secret-key"
-chatsorter = ChatSorter(api_key="sk_live_xxx")
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    # Create unique ID per session
-    if 'user_id' not in session:
-        session['user_id'] = str(uuid.uuid4())
-    
-    user_id = session['user_id']
-    user_message = request.json['message']
-    
-    prompt = chatsorter.build_prompt(
-        chat_id=user_id,
-        message=user_message,
-        prompt_template="User: {message}\nAssistant:"
-    )
-    
-    response = your_model.generate(prompt)
-    return jsonify({'response': response})
 ```
 
 ---
 
 ## API Methods
 
-### `build_prompt()` - One-Line Integration
+### `build_prompt()` - All-in-One
+
+Stores message, retrieves relevant memories, builds prompt.
+
 ```python
 prompt = chatsorter.build_prompt(
     chat_id="user_123",
     message="What's my name?",
     prompt_template="User: {message}\nAssistant:",
-    simple_context=False,  # True for 7B/quantized models
-    max_memories=3  # Number of relevant memories to include
+    simple_context=False,  # Set True for small/quantized models
+    max_memories=3
 )
 ```
-Automatically stores message, searches memory, and builds prompt.
-
----
 
 ### `get_context()` + `process()` - Manual Control
+
+For when you need separate retrieval and storage (e.g., OpenAI/Claude).
+
 ```python
-# Get relevant context
+# Retrieve relevant memories
 context = chatsorter.get_context(
     chat_id="user_123",
     message="What food do I like?",
-    max_results=3,
-    simple_context=False
+    max_results=3
 )
 
 # Store message
@@ -279,69 +174,27 @@ chatsorter.process(
     message="What food do I like?"
 )
 ```
-Use when you need separate context retrieval and storage steps (e.g., OpenAI/Claude).
-
----
 
 ### `search()` - Direct Search
+
 ```python
 results = chatsorter.search(
     chat_id="user_123",
-    query="food preferences",
-    simple_context=False
+    query="food preferences"
 )
 
-if results['result']['found']:
-    for item in results['result']['results']:
-        print(f"{item['content']} (score: {item['retrieval_score']})")
+for item in results['result']['results']:
+    print(f"{item['content']} (score: {item['retrieval_score']})")
 ```
 
 ---
 
-### `get_stats()` - Usage Stats
-```python
-stats = chatsorter.get_stats(chat_id="user_123")
-# Returns: message_count, summary_files, master_exists, performance metrics
-```
+## Configuration
 
----
+### Prompt Templates
 
-### `get_memory_analysis()` - Detailed Memory View
-```python
-analysis = chatsorter.get_memory_analysis(chat_id="user_123")
-# Returns: all memory items, importance scores, entities, intents, decay stats
-```
+Must include `{message}`. Optionally include `{context}` for memory.
 
----
-
-## Configuration Options
-
-### `simple_context` Parameter
-
-**Use `simple_context=True` for:**
-- 7B models (Mistral 7B, Llama 2 7B)
-- Quantized models (Q2_K, Q4_K_M, Q5_K_M)
-- Any model that shows `(importance: 8.5)` in responses
-
-**Use `simple_context=False` (default) for:**
-- GPT-4, GPT-3.5-turbo
-- Claude 2, Claude 3
-- Llama 2 13B+ (unquantized)
-- Mixtral 8x7B
-
-**What it does:**
-- `False`: Includes metadata (importance scores, age) in context
-- `True`: Just the content, no metadata
-
----
-
-### Template Variables
-
-Your `prompt_template` must include:
-- `{message}` - Where user's current message goes
-- `{context}` (optional) - Where memory context goes
-
-**Examples:**
 ```python
 # Simple
 "User: {message}\nAssistant:"
@@ -351,217 +204,136 @@ Your `prompt_template` must include:
 
 # Instruct format
 "[INST] {context}{message} [/INST]"
-
-# System prompt
-"System: You are helpful.\n{context}User: {message}\nAssistant:"
 ```
 
-**If using f-strings, use double braces:**
+If using f-strings, escape ChatSorter placeholders:
 ```python
-prompt_template=f"System: You are {bot_name}.\nUser: {{message}}\nAssistant:"
+prompt_template = f"System: You are {bot_name}.\nUser: {{message}}\nAssistant:"
 ```
 
----
+### Simple Context Mode
 
-## What Gets Stored
+Set `simple_context=True` for:
+- 7B models (Llama 7B, Mistral 7B)
+- Quantized models (Q2_K, Q4_K_M, Q5_K_M)
+- Models that leak metadata into responses
 
-ChatSorter automatically creates:
+This strips importance scores and metadata from context.
 
-### Summary Files (Every 5 Messages)
-```
-{chat_id}_summary.json       # Messages 1-5
-{chat_id}_summary_2.json     # Messages 6-10
-{chat_id}_summary_3.json     # Messages 11-15
-```
-
-Contains:
-- Aggregated summary of 5 messages
-- Entities extracted (people, places, skills)
-- Intents detected (questions, preferences, goals)
-- Topic shift detection
-- Semantic embeddings
-- Importance score (averaged across messages)
-
-### Master JSON (High-Importance Items)
-```
-{chat_id}_master.json
-```
-
-Contains:
-- Individual messages with importance ≥ 7.0
-- Manually flagged items (importance 10.0)
-- Full metadata (entities, intents, decisions)
-- Never decays if importance ≥ 9.0
-
----
-
-## View Your Data
-
-### Get All Data for a User
-```bash
-curl -H "Authorization: Bearer sk_live_xxx" \
-  https://chatsorter-api.onrender.com/download/user_123
-```
-
-Returns all summary files + master JSON.
-
-### Get Only Important Moments (≥8.0)
-```bash
-curl -H "Authorization: Bearer sk_live_xxx" \
-  https://chatsorter-api.onrender.com/moments/user_123
-```
-
-### Add Debug Routes
 ```python
-@app.route('/debug/memory')
-def debug_memory():
-    return jsonify(chatsorter.get_memory_analysis(chat_id="user_123"))
-
-@app.route('/debug/stats')
-def debug_stats():
-    return jsonify(chatsorter.get_stats(chat_id="user_123"))
+prompt = chatsorter.build_prompt(..., simple_context=True)
 ```
 
 ---
 
-## Common Issues
+## How It Works
 
-### Import Error
+1. **Message arrives** → Scores importance (0-10), extracts entities, detects intent
+2. **Stores intelligently:**
+   - Every 5 messages → Creates summary
+   - Importance ≥ 7.0 → Stores individually
+   - Importance ≥ 9.0 → Never decays
+3. **Retrieves semantically:**
+   - Embeds current message
+   - Searches past embeddings (cosine similarity)
+   - Ranks by: similarity × importance × recency
+   - Returns top 3-5 memories
+4. **Time decay** gradually reduces importance of old, low-value messages
+
+**Performance:** 0.5ms retrieval time, regardless of history length.
+
+---
+
+## Pricing
+
+- **Demo:** 100 messages (testing only)
+- **Starter:** $60/month - 10K messages, 30-day retention
+- **Pro:** $150/month - 50K messages, 90-day retention
+- **Enterprise:** Custom pricing - unlimited everything
+
+Email for production API key: `theiogamer1st@gmail.com`
+
+---
+
+## Production Checklist
+
+```python
+# Use environment variables
+import os
+chatsorter = ChatSorter(api_key=os.getenv("CHATSORTER_API_KEY"))
+
+# Use real user IDs (not "default")
+chat_id = session['user_id']  # Flask
+chat_id = request.user.id      # Django
 ```
-ModuleNotFoundError: No module named 'chatsorter_client'
-```
-**Fix:**
+
+---
+
+## Troubleshooting
+
+**401 Unauthorized**
+- Check API key starts with `sk_live_` or `sk_test_`
+- Verify no extra spaces
+
+**Memory not working**
+- Use consistent `chat_id` for same user
+- Don't generate new UUID each request
+
+**Metadata bleeding into responses** (e.g., "Your name is Alex (importance: 8.5)")
+- Set `simple_context=True`
+- Or strip metadata: `re.sub(r'\(importance:.*?\)', '', response)`
+
+**Import error**
 ```bash
 pip install git+https://github.com/codeislife12/chatsorter-client.git
 ```
 
 ---
 
-### 401 Unauthorized
-**Fix:** Check API key has no spaces, starts with `sk_live_` or `sk_test_`
+## API Endpoints
 
----
+Base: `https://chatsorter-api.onrender.com`
 
-### Memory Not Working
-**Check:**
-1. Using same `chat_id` for same user (not random UUID each time)
-2. Wait 2-3 seconds between test messages
-3. Look for `[ChatSorter]` logs in terminal
-
----
-
-### Metadata Bleeding (Small Models)
-Bot responds with: `"Your name is Jacob (importance: 8.5)"`
-
-**Fix 1:** Use `simple_context=True`
-```python
-prompt = chatsorter.build_prompt(..., simple_context=True)
-```
-
-**Fix 2:** Regex cleanup
-```python
-import re
-response = re.sub(r'\(importance:.*?\)', '', response).strip()
-```
-
----
-
-### Multiple Variables in Template
-```python
-prompt_template=f"System: {bot_name}.\nUser: {user_message}"  # ❌ Conflict
-```
-
-**Fix:** Use double braces for ChatSorter placeholders
-```python
-prompt_template=f"System: {bot_name}.\nUser: {{message}}"  # ✅ Works
-```
-
----
-
-## Production Deployment
-
-### Environment Variable (Recommended)
-```python
-import os
-chatsorter = ChatSorter(api_key=os.getenv("CHATSORTER_API_KEY"))
-```
-
-Set on your server:
-```bash
-export CHATSORTER_API_KEY="sk_live_xxx"
-```
-
-### Use Real User IDs
-```python
-# ❌ Testing
-chat_id = "default"
-
-# ✅ Production
-chat_id = session['user_id']         # Flask
-chat_id = request.user.id             # Django
-chat_id = request.json.get('user_id') # API
-```
-
----
-
-## API Endpoints (Advanced)
-
-Base URL: `https://chatsorter-api.onrender.com`
+All require `Authorization: Bearer YOUR_API_KEY` header.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/process` | POST | Store message |
 | `/search` | POST | Search memories |
 | `/flag` | POST | Mark as critical (importance 10.0) |
-| `/download/{chat_id}` | GET | Download all JSON files |
-| `/moments/{chat_id}` | GET | Get high-importance (≥8.0) |
+| `/moments/{chat_id}` | GET | High-importance memories (≥8.0) |
 | `/stats?chat_id=X` | GET | Usage statistics |
-| `/memory/{chat_id}` | GET | Full memory analysis |
-| `/health` | GET | API health check |
-
-All require `Authorization: Bearer YOUR_API_KEY` header.
-
----
-
-## How It Works
-
-1. **Message arrives** → Extracts entities (people, places), detects intent (question/preference/goal), scores importance (0-10)
-2. **Stores intelligently:**
-   - Every 5 messages → Creates summary JSON
-   - Importance ≥ 7.0 → Stores in master JSON
-   - Importance ≥ 9.0 → Never decays
-3. **Retrieves semantically:**
-   - Creates embedding for current message
-   - Searches past embeddings (cosine similarity)
-   - Ranks by: similarity × importance × recency
-   - Returns top 3-5 relevant memories
-4. **Time decay:**
-   - High importance (9.0+): 98% retention per 30 days
-   - Important (8.0+): 95% retention per 30 days
-   - Medium (6.0+): 90% retention per 30 days
-   - Low (<6.0): 85% retention per 30 days
-
-**Performance:** 0.5ms average retrieval time, stays constant regardless of total messages.
-
----
-
-## Pricing
-
-- **Demo:** Free during beta
-- **Production:** $40-80/month (vs $200+ competitors)
-- **ROI:** Save $20K+/month on API costs (95% context reduction)
+| `/health` | GET | API status |
 
 ---
 
 ## Support
 
 **Email:** theiogamer1st@gmail.com  
-**Subject:** "ChatSorter Integration Help"
+**Subject:** "ChatSorter Help"
 
 Include:
-1. Your chat function code (~20-50 lines)
-2. Error message (if any)
-3. Framework (Flask/FastAPI/etc.)
-4. Model (OpenAI/Claude/local GGUF)
+1. Code snippet (~20-50 lines)
+2. Error message
+3. Framework and model type
 
 Response within 24 hours.
+
+---
+
+## Why ChatSorter vs Building It Yourself
+
+| Task | Time | ChatSorter |
+|------|------|------------|
+| Semantic embeddings | 2 weeks | ✅ Included |
+| Importance scoring logic | 1 week | ✅ Included |
+| Time decay algorithm | 3 days | ✅ Included |
+| Entity extraction | 1 week | ✅ Included |
+| Storage optimization | 1 week | ✅ Included |
+| **Total** | **6+ weeks** | **5 minutes** |
+
+**Gleam.ai comment:** *"Took us 3 months to build something similar. Would use ChatSorter if starting fresh."*
+
+---
+
+**Note:** Demo key (`sk_test_demo123`) limited to 100 messages for testing. Email for production key.
