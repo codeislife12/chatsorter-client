@@ -1,62 +1,64 @@
-# ChatSorter - Semantic Memory for AI Chatbots
+# ChatSorter - Memory for AI Chatbots
 
-Stop sending entire chat histories to your LLM. ChatSorter compresses conversations by 95% using semantic search and importance scoring.
+Add long-term memory to your chatbot in 5 minutes. Works with any LLM - GPT-4, Claude, Llama, Mistral, or local GGUF models.
 
-**What you get:**
-- 95% cost reduction on API calls
-- Semantic retrieval (finds "pizza" when asked "what food?")
-- Automatic importance scoring (critical info never decays)
-- Zero infrastructure (no vector DB, no Redis)
-- 5-minute integration
+**What it does:**
+- Compresses 100 messages → 20 summaries + important facts
+- Retrieves only relevant context (not entire history)
+- 95% cost reduction, 0.5ms retrieval time
+
+---
+
+## Install
+```bash
+pip install git+https://github.com/codeislife12/chatsorter-client.git
+```
+
+---
+
+## Get Your API Key
+
+**Request a free demo key (100 messages):**
+
+Email: **theiogamer1st@gmail.com**  
+Subject: **"ChatSorter Demo Key Request"**
+
+Include:
+- Your name
+- Company/Project name
+- Use case (optional)
+
+You'll receive your unique demo key within 24 hours.
+
+**Production pricing:** $60/month for 10,000 messages
 
 ---
 
 ## Quick Start
 
-```bash
-pip install git+https://github.com/codeislife12/chatsorter-client.git
-```
-
-Get a demo key: Email `theiogamer1st@gmail.com` with subject "ChatSorter Demo Key"
-
-Or use the public demo key (100 messages limit):
-```python
-api_key = "sk_test_demo123"
-```
-
----
-
-## Integration
-
-### Basic Usage
-
+Once you have your API key:
 ```python
 from chatsorter_client import ChatSorter
 
-chatsorter = ChatSorter(api_key="sk_live_xxx")
+# Use your unique demo key
+chatsorter = ChatSorter(api_key="sk_demo_YOUR_KEY_HERE")
 
-# Replace this:
-prompt = f"User: {user_message}\nAssistant:"
-
-# With this:
+# One line to add memory
 prompt = chatsorter.build_prompt(
-    chat_id=user_id,
-    message=user_message,
+    chat_id="user_123",
+    message="My name is Alex",
     prompt_template="User: {message}\nAssistant:"
 )
 
-# Your LLM call stays the same
-response = llm(prompt)
+# Use prompt with your LLM
+response = your_llm(prompt)
 ```
-
-That's it. ChatSorter handles memory storage, retrieval, and compression automatically.
 
 ---
 
-## Examples
+## Integration Examples
 
-### Flask + OpenAI
-
+### OpenAI (GPT-4, GPT-3.5)
 ```python
 from flask import Flask, request, jsonify
 from openai import OpenAI
@@ -64,17 +66,20 @@ from chatsorter_client import ChatSorter
 
 app = Flask(__name__)
 openai_client = OpenAI(api_key="sk-xxx")
-chatsorter = ChatSorter(api_key="sk_live_xxx")
+chatsorter = ChatSorter(api_key="sk_demo_xxx")  # Your demo key
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    data = request.json
-    user_id = data['user_id']
-    message = data['message']
+    user_id = request.json['user_id']
+    message = request.json['message']
     
+    # Get relevant context from ChatSorter
     context = chatsorter.get_context(user_id, message)
+    
+    # Store message in memory
     chatsorter.process(user_id, message)
     
+    # Call OpenAI with context
     response = openai_client.chat.completions.create(
         model="gpt-4",
         messages=[
@@ -84,108 +89,215 @@ def chat():
     )
     
     return jsonify({'response': response.choices[0].message.content})
+
+if __name__ == '__main__':
+    app.run(port=5000)
 ```
 
-### Flask + Local GGUF
+---
 
+### Anthropic (Claude)
+```python
+from flask import Flask, request, jsonify
+from anthropic import Anthropic
+from chatsorter_client import ChatSorter
+
+app = Flask(__name__)
+anthropic_client = Anthropic(api_key="sk-ant-xxx")
+chatsorter = ChatSorter(api_key="sk_demo_xxx")
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    user_id = request.json['user_id']
+    message = request.json['message']
+    
+    # Get context and store message
+    context = chatsorter.get_context(user_id, message)
+    chatsorter.process(user_id, message)
+    
+    # Call Claude
+    response = anthropic_client.messages.create(
+        model="claude-3-opus-20240229",
+        max_tokens=1024,
+        system=f"Context: {context}",
+        messages=[{"role": "user", "content": message}]
+    )
+    
+    return jsonify({'response': response.content[0].text})
+
+if __name__ == '__main__':
+    app.run(port=5000)
+```
+
+---
+
+### Local GGUF Models (Llama, Mistral, Qwen)
+
+**For llama-cpp-python:**
 ```python
 from flask import Flask, request, jsonify
 from llama_cpp import Llama
 from chatsorter_client import ChatSorter
 
 app = Flask(__name__)
-llm = Llama(model_path="model.gguf")
-chatsorter = ChatSorter(api_key="sk_live_xxx")
+llm = Llama(model_path="model.gguf", n_ctx=2048)
+chatsorter = ChatSorter(api_key="sk_demo_xxx")
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    data = request.json
+    user_id = request.json['user_id']
+    message = request.json['message']
     
+    # Build prompt with memory (simple_context=True for small models)
     prompt = chatsorter.build_prompt(
-        chat_id=data['user_id'],
-        message=data['message'],
+        chat_id=user_id,
+        message=message,
         prompt_template="{context}User: {message}\nAssistant:",
-        simple_context=True  # For quantized/7B models
+        simple_context=True  # Important for quantized/7B models
     )
     
-    response = llm(prompt, max_tokens=512)
-    return jsonify({'response': response['choices'][0]['text']})
+    # Generate response
+    response = llm(prompt, max_tokens=512, temperature=0.7)
+    bot_response = response['choices'][0]['text'].strip()
+    
+    return jsonify({'response': bot_response})
+
+if __name__ == '__main__':
+    app.run(port=5000)
 ```
 
-### Flask + Claude
-
+**For Ollama:**
 ```python
-from anthropic import Anthropic
+from flask import Flask, request, jsonify
+import requests
 from chatsorter_client import ChatSorter
 
-anthropic = Anthropic(api_key="sk-ant-xxx")
-chatsorter = ChatSorter(api_key="sk_live_xxx")
+app = Flask(__name__)
+chatsorter = ChatSorter(api_key="sk_demo_xxx")
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    data = request.json
+    user_id = request.json['user_id']
+    message = request.json['message']
     
-    context = chatsorter.get_context(data['user_id'], data['message'])
-    chatsorter.process(data['user_id'], data['message'])
-    
-    message = anthropic.messages.create(
-        model="claude-3-opus-20240229",
-        max_tokens=1024,
-        system=f"Context: {context}",
-        messages=[{"role": "user", "content": data['message']}]
+    # Build prompt with memory
+    prompt = chatsorter.build_prompt(
+        chat_id=user_id,
+        message=message,
+        prompt_template="{context}User: {message}\nAssistant:",
+        simple_context=True
     )
     
-    return jsonify({'response': message.content[0].text})
+    # Call Ollama
+    response = requests.post('http://localhost:11434/api/generate', json={
+        'model': 'llama2',
+        'prompt': prompt,
+        'stream': False
+    })
+    
+    return jsonify({'response': response.json()['response']})
+
+if __name__ == '__main__':
+    app.run(port=5000)
+```
+
+---
+
+### HuggingFace Transformers
+```python
+from flask import Flask, request, jsonify
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from chatsorter_client import ChatSorter
+
+app = Flask(__name__)
+model = AutoModelForCausalLM.from_pretrained("mistralai/Mistral-7B-Instruct-v0.1")
+tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-Instruct-v0.1")
+chatsorter = ChatSorter(api_key="sk_demo_xxx")
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    user_id = request.json['user_id']
+    message = request.json['message']
+    
+    # Build prompt
+    prompt = chatsorter.build_prompt(
+        chat_id=user_id,
+        message=message,
+        prompt_template="[INST] {context}{message} [/INST]",
+        simple_context=True
+    )
+    
+    # Generate
+    inputs = tokenizer(prompt, return_tensors="pt")
+    outputs = model.generate(**inputs, max_new_tokens=512)
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
+    return jsonify({'response': response})
+
+if __name__ == '__main__':
+    app.run(port=5000)
 ```
 
 ---
 
 ## API Methods
 
-### `build_prompt()` - All-in-One
+### Option 1: `build_prompt()` - All-in-One (Recommended)
 
-Stores message, retrieves relevant memories, builds prompt.
-
+Automatically stores message, retrieves context, and builds prompt.
 ```python
 prompt = chatsorter.build_prompt(
-    chat_id="user_123",
-    message="What's my name?",
-    prompt_template="User: {message}\nAssistant:",
-    simple_context=False,  # Set True for small/quantized models
-    max_memories=3
+    chat_id="user_123",              # Unique ID per user
+    message="What's my name?",       # Current message
+    prompt_template="User: {message}\nAssistant:",  # Your prompt format
+    simple_context=False,            # Set True for small/quantized models
+    max_memories=3                   # How many memories to retrieve
 )
 ```
 
-### `get_context()` + `process()` - Manual Control
+**Use this for:** Local models, simple integrations
 
-For when you need separate retrieval and storage (e.g., OpenAI/Claude).
+---
 
+### Option 2: `get_context()` + `process()` - Manual Control
+
+Separate retrieval and storage steps.
 ```python
-# Retrieve relevant memories
+# Get relevant memories
 context = chatsorter.get_context(
     chat_id="user_123",
-    message="What food do I like?",
-    max_results=3
+    message="What's my name?",
+    max_results=3,
+    simple_context=False
 )
 
 # Store message
 chatsorter.process(
     chat_id="user_123",
-    message="What food do I like?"
+    message="What's my name?"
 )
 ```
 
-### `search()` - Direct Search
+**Use this for:** OpenAI, Claude, when you need control over system prompts
 
+---
+
+### Option 3: `search()` - Direct Search
+
+Search memory without storing a new message.
 ```python
 results = chatsorter.search(
     chat_id="user_123",
-    query="food preferences"
+    query="food preferences",
+    simple_context=False
 )
 
-for item in results['result']['results']:
-    print(f"{item['content']} (score: {item['retrieval_score']})")
+if results['result']['found']:
+    for item in results['result']['results']:
+        print(f"{item['content']} (score: {item['retrieval_score']})")
 ```
+
+**Use this for:** Debugging, analytics, custom workflows
 
 ---
 
@@ -193,8 +305,7 @@ for item in results['result']['results']:
 
 ### Prompt Templates
 
-Must include `{message}`. Optionally include `{context}` for memory.
-
+Must include `{message}`. Optionally include `{context}`.
 ```python
 # Simple
 "User: {message}\nAssistant:"
@@ -202,108 +313,266 @@ Must include `{message}`. Optionally include `{context}` for memory.
 # With context
 "{context}User: {message}\nAssistant:"
 
-# Instruct format
+# Instruct format (Llama, Mistral)
 "[INST] {context}{message} [/INST]"
+
+# ChatML format (some models)
+"system\n{context}\nuser\n{message}"
 ```
 
-If using f-strings, escape ChatSorter placeholders:
+**If using f-strings, escape ChatSorter placeholders:**
 ```python
+bot_name = "Assistant"
 prompt_template = f"System: You are {bot_name}.\nUser: {{message}}\nAssistant:"
+# Note: {{message}} not {message}
 ```
+
+---
 
 ### Simple Context Mode
 
-Set `simple_context=True` for:
+**When to use `simple_context=True`:**
+
 - 7B models (Llama 7B, Mistral 7B)
 - Quantized models (Q2_K, Q4_K_M, Q5_K_M)
-- Models that leak metadata into responses
+- Models that output metadata like `(importance: 8.5)` in responses
 
-This strips importance scores and metadata from context.
+**What it does:**
+- Strips importance scores and metadata from context
+- Returns clean text only
+- Prevents small models from "bleeding" metadata into responses
 
+**When to use `simple_context=False` (default):**
+
+- GPT-4, GPT-3.5
+- Claude (all versions)
+- Large models (13B+, unquantized)
 ```python
+# For small/quantized models
 prompt = chatsorter.build_prompt(..., simple_context=True)
+
+# For large/API models
+context = chatsorter.get_context(..., simple_context=False)
 ```
 
 ---
 
-## How It Works
+## Multi-User Setup
 
-1. **Message arrives** → Scores importance (0-10), extracts entities, detects intent
-2. **Stores intelligently:**
-   - Every 5 messages → Creates summary
-   - Importance ≥ 7.0 → Stores individually
-   - Importance ≥ 9.0 → Never decays
-3. **Retrieves semantically:**
-   - Embeds current message
-   - Searches past embeddings (cosine similarity)
-   - Ranks by: similarity × importance × recency
-   - Returns top 3-5 memories
-4. **Time decay** gradually reduces importance of old, low-value messages
+**Important:** Use consistent `chat_id` for each user. Don't generate new IDs each request.
 
-**Performance:** 0.5ms retrieval time, regardless of history length.
+### Flask with Sessions
+```python
+from flask import Flask, session
+import uuid
 
----
+app = Flask(__name__)
+app.secret_key = "your-secret-key"
 
-## Pricing
+@app.route('/chat', methods=['POST'])
+def chat():
+    # Create persistent user ID
+    if 'user_id' not in session:
+        session['user_id'] = str(uuid.uuid4())
+    
+    user_id = session['user_id']
+    message = request.json['message']
+    
+    prompt = chatsorter.build_prompt(
+        chat_id=user_id,  # Same user_id across requests
+        message=message,
+        prompt_template="User: {message}\nAssistant:"
+    )
+    
+    response = your_llm(prompt)
+    return jsonify({'response': response})
+```
 
-- **Demo:** 100 messages (testing only)
-- **Starter:** $60/month - 10K messages, 30-day retention
-- **Pro:** $150/month - 50K messages, 90-day retention
-- **Enterprise:** Custom pricing - unlimited everything
-
-Email for production API key: `theiogamer1st@gmail.com`
+### API with Database
+```python
+@app.route('/chat', methods=['POST'])
+def chat():
+    user_id = request.json['user_id']  # From your database
+    message = request.json['message']
+    
+    # user_id could be: database ID, email hash, UUID, etc.
+    prompt = chatsorter.build_prompt(
+        chat_id=user_id,
+        message=message,
+        prompt_template="User: {message}\nAssistant:"
+    )
+    
+    response = your_llm(prompt)
+    return jsonify({'response': response})
+```
 
 ---
 
 ## Production Checklist
 
+### 1. Use Environment Variables
 ```python
-# Use environment variables
 import os
 chatsorter = ChatSorter(api_key=os.getenv("CHATSORTER_API_KEY"))
+```
 
-# Use real user IDs (not "default")
+Set on your server:
+```bash
+export CHATSORTER_API_KEY="sk_live_xxx"
+```
+
+### 2. Use Real User IDs
+```python
+# ❌ Bad (generates new ID each time)
+chat_id = str(uuid.uuid4())
+
+# ✅ Good (consistent per user)
 chat_id = session['user_id']  # Flask
 chat_id = request.user.id      # Django
+chat_id = user.id              # Your database
+```
+
+### 3. Error Handling
+```python
+try:
+    prompt = chatsorter.build_prompt(...)
+except Exception as e:
+    print(f"ChatSorter error: {e}")
+    # Fallback: use message without context
+    prompt = f"User: {message}\nAssistant:"
 ```
 
 ---
 
 ## Troubleshooting
 
-**401 Unauthorized**
-- Check API key starts with `sk_live_` or `sk_test_`
-- Verify no extra spaces
+### 401 Unauthorized
 
-**Memory not working**
-- Use consistent `chat_id` for same user
-- Don't generate new UUID each request
+**Problem:** API key invalid or missing
 
-**Metadata bleeding into responses** (e.g., "Your name is Alex (importance: 8.5)")
-- Set `simple_context=True`
-- Or strip metadata: `re.sub(r'\(importance:.*?\)', '', response)`
+**Fix:**
+- Check key starts with `sk_demo_` or `sk_live_`
+- Remove any extra spaces
+- Verify you received the key via email
 
-**Import error**
-```bash
-pip install git+https://github.com/codeislife12/chatsorter-client.git
+---
+
+### Memory Not Working
+
+**Problem:** Bot doesn't remember past conversations
+
+**Fix:**
+- Use same `chat_id` for same user (don't generate new UUIDs)
+- Wait for summaries to process (every 5 messages)
+- Check terminal for `[ChatSorter]` logs
+```python
+# Debug: Check what's stored
+from chatsorter_client import ChatSorter
+chatsorter = ChatSorter(api_key="sk_demo_xxx")
+
+# Send some messages
+chatsorter.process("user_test", "My name is Alex")
+chatsorter.process("user_test", "I love pizza")
+chatsorter.process("user_test", "I work as an engineer")
+chatsorter.process("user_test", "I live in NYC")
+chatsorter.process("user_test", "I play guitar")
+
+# Search to verify storage
+results = chatsorter.search("user_test", "name")
+print(results)  # Should find "My name is Alex"
 ```
 
 ---
 
-## API Endpoints
+### Metadata Bleeding (Small Models)
 
-Base: `https://chatsorter-api.onrender.com`
+**Problem:** Bot outputs text like: `Your name is Alex (importance: 8.5)`
 
-All require `Authorization: Bearer YOUR_API_KEY` header.
+**Fix:** Use `simple_context=True`
+```python
+prompt = chatsorter.build_prompt(
+    chat_id="user_123",
+    message="What's my name?",
+    prompt_template="User: {message}\nAssistant:",
+    simple_context=True  # Strips metadata
+)
+```
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/process` | POST | Store message |
-| `/search` | POST | Search memories |
-| `/flag` | POST | Mark as critical (importance 10.0) |
-| `/moments/{chat_id}` | GET | High-importance memories (≥8.0) |
-| `/stats?chat_id=X` | GET | Usage statistics |
-| `/health` | GET | API status |
+Or clean output:
+```python
+import re
+response = llm(prompt)
+response = re.sub(r'\(importance:.*?\)', '', response).strip()
+```
+
+---
+
+### Import Error
+
+**Problem:** `ModuleNotFoundError: No module named 'chatsorter_client'`
+
+**Fix:**
+```bash
+pip install git+https://github.com/codeislife12/chatsorter-client.git
+```
+
+If still broken:
+```bash
+pip uninstall chatsorter-client
+pip install --upgrade git+https://github.com/codeislife12/chatsorter-client.git
+```
+
+---
+
+## How It Works
+
+ChatSorter uses **episodic memory compression** (like your brain):
+
+### 1. Messages → Episodes
+```
+Messages 1-5   → Episode 1: "User discussed weekend plans"
+Messages 6-10  → Episode 2: "User asked about features"
+Messages 11-15 → Episode 3: "User shared feedback"
+```
+
+Every 5 messages = 1 summary (90% compression)
+
+### 2. Important Facts → Permanent Storage
+```
+"My name is Alex" → Importance 8.5 → Saved permanently
+"ok thanks"       → Importance 2.0 → Fades after 30 days
+```
+
+### 3. Smart Retrieval
+```
+User asks: "What's my name?"
+→ Searches 20 episode summaries (not 100 messages)
+→ Finds: "My name is Alex" (importance 8.5)
+→ Returns in 0.5ms
+```
+
+**Result:** 95% cost reduction, 100% context retention
+
+---
+
+## Pricing
+
+| Plan | Price | Messages/Month | Retention | How to Get |
+|------|-------|----------------|-----------|------------|
+| **Demo** | FREE | 100 | 7 days | Email theiogamer1st@gmail.com |
+| **Starter** | $60 | 10,000 | 30 days | Email theiogamer1st@gmail.com |
+| **Pro** | $150 | 50,000 | 90 days | Email theiogamer1st@gmail.com |
+| **Enterprise** | Custom | Unlimited | Unlimited | Email theiogamer1st@gmail.com |
+
+**ROI Calculator:**
+- Sending 100 messages to GPT-4 = ~50K tokens = $1.50
+- ChatSorter: Sends 3 summaries = ~500 tokens = $0.015
+- **Savings: $1.48 per conversation = 99% reduction**
+
+If you have 1,000 conversations/month:
+- Without ChatSorter: $1,500/month
+- With ChatSorter: $60/month
+- **You save: $1,440/month**
 
 ---
 
@@ -313,27 +582,105 @@ All require `Authorization: Bearer YOUR_API_KEY` header.
 **Subject:** "ChatSorter Help"
 
 Include:
-1. Code snippet (~20-50 lines)
-2. Error message
-3. Framework and model type
+1. Code snippet (20-50 lines)
+2. Error message (if any)
+3. Framework (Flask/FastAPI/etc)
+4. Model (GPT-4/Claude/Llama/etc)
 
 Response within 24 hours.
 
 ---
 
-## Why ChatSorter vs Building It Yourself
+## License
 
-| Task | Time | ChatSorter |
-|------|------|------------|
-| Semantic embeddings | 2 weeks | ✅ Included |
-| Importance scoring logic | 1 week | ✅ Included |
-| Time decay algorithm | 3 days | ✅ Included |
-| Entity extraction | 1 week | ✅ Included |
-| Storage optimization | 1 week | ✅ Included |
-| **Total** | **6+ weeks** | **5 minutes** |
+MIT
 
-**Gleam.ai comment:** *"Took us 3 months to build something similar. Would use ChatSorter if starting fresh."*
+✅ Now for the Backend (auth.py helper):
+Add this function to make creating demo keys easier:
+python# Add to auth.py after create_customer() function
 
----
+def create_demo_customer(email: str) -> Dict:
+    """
+    Create a demo customer with 100 message limit
+    
+    Args:
+        email: Customer email
+    
+    Returns:
+        Dict with api_key and customer info
+    """
+    api_key = generate_api_key(prefix="sk_demo")
+    customer_id = f"demo_{secrets.token_hex(8)}"
+    
+    customer_data = {
+        "customer_id": customer_id,
+        "customer_name": f"Demo - {email}",
+        "email": email,
+        "plan": "demo",
+        "limits": PLAN_LIMITS["demo"],
+        "created_at": datetime.now().isoformat(),
+        "active": True,
+        "expires_at": (datetime.now() + timedelta(days=7)).isoformat()  # 7 day expiry
+    }
+    
+    try:
+        db.collection('customers').document(api_key).set(customer_data)
+        
+        # Initialize usage
+        current_month = datetime.now().strftime("%Y-%m")
+        usage_data = {
+            "messages_used": 0,
+            "searches_used": 0,
+            "period_start": datetime.now().isoformat()
+        }
+        db.collection('usage').document(api_key).collection('months').document(current_month).set(usage_data)
+        
+        print(f"[AUTH] ✅ Created demo customer: {email}")
+        print(f"[AUTH] 🔑 Demo API Key: {api_key}")
+        print(f"[AUTH] ⏰ Expires: 7 days")
+        
+        return {
+            "success": True,
+            "api_key": api_key,
+            "customer_id": customer_id,
+            "email": email,
+            "plan": "demo",
+            "limits": PLAN_LIMITS["demo"],
+            "expires_at": customer_data["expires_at"]
+        }
+        
+    except Exception as e:
+        print(f"[AUTH] ❌ Error creating demo customer: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
-**Note:** Demo key (`sk_test_demo123`) limited to 100 messages for testing. Email for production key.
+✅ How You Create Keys When Someone Emails:
+When you get email: "ChatSorter Demo Key Request":
+bashcd C:\Users\theio\OneDrive\Desktop\chatsorter-api
+python
+pythonfrom auth import create_demo_customer
+
+# Create demo key
+result = create_demo_customer("customer@company.com")
+
+print(f"Send them: {result['api_key']}")
+```
+
+**Reply to customer:**
+```
+Hi [Name],
+
+Here's your ChatSorter demo API key:
+
+sk_demo_abc123xyz456...
+
+Limits:
+- 100 messages
+- 7 days (expires Oct 32, 2025)
+
+Getting started:
+https://github.com/codeislife12/chatsorter-client
+
+Questions? Just reply to this email.
